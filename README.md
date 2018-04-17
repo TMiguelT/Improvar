@@ -7,8 +7,10 @@ listed in the header, even if your template didn't.
 ## Installation
 Install `vcffake` using:
 ```bash
-pip install git+http://https://github.com/TMiguelT/VcfFake#egg=vcffake
+pip install 'git+https://github.com/TMiguelT/VcfFake#egg=vcffake'
 ```
+
+Note that `vcffake` will probably only work on Python 3.6 and above
 
 ## Usage
 `vcffake` installs a command-line utility called `vcffake`. Its usage is as follows:

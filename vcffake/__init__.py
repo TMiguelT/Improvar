@@ -4,6 +4,10 @@ import string
 import os
 import random
 import argparse
+from signal import signal, SIGPIPE, SIG_DFL
+
+# Handle SIGPIPE so this pipes into `head` correctly
+signal(SIGPIPE, SIG_DFL)
 
 
 def path_exists(arg: str):

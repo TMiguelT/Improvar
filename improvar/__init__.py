@@ -4,10 +4,18 @@ import string
 import os
 import random
 import argparse
+import enum
+import itertools
 from signal import signal, SIGPIPE, SIG_DFL
 
 # Handle SIGPIPE so this pipes into `head` correctly
 signal(SIGPIPE, SIG_DFL)
+
+
+class GenotypeOption(enum.Enum):
+    HOM_REF = 'hom-ref'
+    HOM_ALT = 'hom-alt'
+    HET = 'het'
 
 
 def path_exists(arg: str):
@@ -28,6 +36,9 @@ def parse_args() -> argparse.Namespace:
         description="Generates a fake VCF based on another VCF's header")
     parser.add_argument('template_vcf', type=path_exists)
     parser.add_argument('--num-variants', '-n', type=int, required=False, default=1)
+    parser.add_argument('--gt-opts', choices=['het', 'hom-ref', 'hom-alt'], type=GenotypeOption, required=False)
+    parser.add_argument('--include-contig', type=str, required=False)
+    parser.add_argument('--exclude-contig', type=str, required=False)
     return parser.parse_args()
 
 
@@ -53,7 +64,7 @@ def calc_multiplicity(key: str, record: pysam.VariantRecord, section: str = 'fmt
         raise NotImplementedError()
 
 
-def data_from_vcf_type(key, record, section='fmt'):
+def data_from_vcf_type(key, record, section='fmt', gt_opts: GenotypeOption = None):
     """
     Generates a random value for a VCF field
     :param type: The VCF header type ("Integer", "Float", "Flag", "Character", or "String")
@@ -61,6 +72,21 @@ def data_from_vcf_type(key, record, section='fmt'):
     char_set = string.ascii_uppercase + string.ascii_lowercase
     multiplicity = calc_multiplicity(key, record, section)
     type = record.header.formats[key].type if section == 'fmt' else record.header.info[key].type
+
+    # GT is an exception
+    if section == 'fmt' and key == 'GT':
+        if gt_opts == GenotypeOption.HET:
+            # If it's a het, we always return the reference, and some number of alts, then shuffle them
+            gt = [0] + random.choice(
+                list(itertools.combinations_with_replacement(range(1, len(record.alleles)), len(record.alleles) - 1)))
+            return random.shuffle(gt)
+        elif gt_opts == GenotypeOption.HOM_ALT:
+            return [1]*len(record.alleles)
+        elif gt_opts == GenotypeOption.HOM_REF:
+            return [0]*len(record.alleles)
+        else:
+            return random.choice(
+                list(itertools.combinations_with_replacement(range(len(record.alleles)), len(record.alleles))))
 
     # VCF types are Integer, Float, Flag, Character, and String
     results = []
@@ -84,9 +110,15 @@ def random_base():
     return random.choice(bases)
 
 
-def generate_record(header: pysam.VariantHeader) -> pysam.VariantRecord:
+def generate_record(header: pysam.VariantHeader,
+                    contig_exclude=None, contig_include=None, **kwargs
+                    ) -> pysam.VariantRecord:
     """
     Generates a variant record with random data, based on the provided header
+    :param header A pysam header to use in generating valid data
+    :param contig_exclude: A glob, or list of strings to exclude from the valid contigs
+    :param contig_include: A glob, or list of strings to include from the valid contigs. Exclude all others
+    :param kwargs: A dictionary of keyword args to pass into the data_from_vcf_type function
     """
     contig = random.choice(header.contigs)
     record = header.new_record(
@@ -99,17 +131,19 @@ def generate_record(header: pysam.VariantHeader) -> pysam.VariantRecord:
     for info in header.info.iterkeys():
         if info == 'END':
             continue
-        record.info[info] = data_from_vcf_type(info, record, 'info')
+        record.info[info] = data_from_vcf_type(info, record, 'info', **kwargs)
 
     # Add FMT fields
     for sample in record.samples.iterkeys():
         for fmt in header.formats.iterkeys():
-            record.samples[sample][fmt] = data_from_vcf_type(fmt, record, 'fmt')
+            record.samples[sample][fmt] = data_from_vcf_type(fmt, record, 'fmt', **kwargs)
 
     return record
 
 
-def generate_data(input_vcf: str, output_vcf: str, num_variants: int = 1):
+def generate_data(input_vcf: str, output_vcf: str,
+                  num_variants: int = 1, **kwargs
+                  ):
     """
     Uses one VCF as a template to generate random VCF records
     """
@@ -117,13 +151,13 @@ def generate_data(input_vcf: str, output_vcf: str, num_variants: int = 1):
     parsed_output = pysam.VariantFile(output_vcf, 'w', header=parsed_input.header)
 
     for i in range(num_variants):
-        record = generate_record(parsed_output.header)
+        record = generate_record(parsed_output.header, **kwargs)
         parsed_output.write(record)
 
 
 def main():
     args = parse_args()
-    generate_data(args.template_vcf, '-', args.num_variants)
+    generate_data(args.template_vcf, '-', args.num_variants, )
 
 
 if __name__ == '__main__':

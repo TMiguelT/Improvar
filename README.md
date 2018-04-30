@@ -1,22 +1,22 @@
-# VCF Fake
+# Improvar
 
-`vcffake` generates fake VCF files using another VCF as a template. This is useful for generating
-test data in bioinformatics situations. In particular, `vcffake` generates values for all the fields
+`improvar` generates fake VCF files using another VCF as a template. This is useful for generating
+test data in bioinformatics situations. In particular, `improvar` generates values for all the fields
 listed in the header, even if your template didn't, allowing you to test your analysis pipeline with
 more completely.
 
 ## Installation
-Install `vcffake` using:
+Install `improvar` using:
 ```bash
-pip install 'git+https://github.com/TMiguelT/VcfFake#egg=vcffake'
+pip install 'git+https://github.com/TMiguelT/VcfFake#egg=improvar'
 ```
 
-Note that `vcffake` will only work on Python 3.6 and above
+Note that `improvar` will only work on Python 3.6 and above
 
 ## Usage
-`vcffake` installs a command-line utility called `vcffake`. Its usage is as follows:
+`improvar` installs a command-line utility called `improvar`. Its usage is as follows:
 ```
-usage: vcffake [-h] [--num-variants NUM_VARIANTS] template_vcf
+usage: improvar [-h] [--num-variants NUM_VARIANTS] template_vcf
 
 Generates a fake VCF based on another VCF's header
 
@@ -28,5 +28,5 @@ optional arguments:
   --num-variants NUM_VARIANTS, -n NUM_VARIANTS
 ```
 
-`vcffake` prints the generated VCF to stdout, so you can pipe the results of this program to a file
+`improvar` prints the generated VCF to stdout, so you can pipe the results of this program to a file
 or to other VCF processing tools

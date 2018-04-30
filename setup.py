@@ -1,13 +1,13 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 setup(
-    name='vcffake',
-    packages=['vcffake'],
+    name='improvar',
+    packages=['improvar'],
     version='0.0.1',
     install_requires=['pysam'],
     entry_points={
         'console_scripts': [
-            'vcffake = vcffake:main',
+            'improvar = improvar:main',
         ]
     }
 )

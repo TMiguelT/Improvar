@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 import pysam
 import string
+import fnmatch
 import os
 import random
 import argparse
 import enum
 import itertools
+import collections
 from signal import signal, SIGPIPE, SIG_DFL
 
 # Handle SIGPIPE so this pipes into `head` correctly
@@ -36,7 +38,7 @@ def parse_args() -> argparse.Namespace:
         description="Generates a fake VCF based on another VCF's header")
     parser.add_argument('template_vcf', type=path_exists)
     parser.add_argument('--num-variants', '-n', type=int, required=False, default=1)
-    parser.add_argument('--gt-opts', choices=['het', 'hom-ref', 'hom-alt'], type=GenotypeOption, required=False)
+    parser.add_argument('--gt-opts', choices=list(GenotypeOption), type=GenotypeOption, required=False)
     parser.add_argument('--include-contig', type=str, required=False)
     parser.add_argument('--exclude-contig', type=str, required=False)
     return parser.parse_args()
@@ -77,16 +79,22 @@ def data_from_vcf_type(key, record, section='fmt', gt_opts: GenotypeOption = Non
     if section == 'fmt' and key == 'GT':
         if gt_opts == GenotypeOption.HET:
             # If it's a het, we always return the reference, and some number of alts, then shuffle them
-            gt = [0] + random.choice(
-                list(itertools.combinations_with_replacement(range(1, len(record.alleles)), len(record.alleles) - 1)))
-            return random.shuffle(gt)
+            gt = [
+                0,
+                *random.choice(list(itertools.combinations_with_replacement(
+                    range(1, len(record.alleles)),
+                    len(record.alleles) - 1
+                )))
+            ]
+            random.shuffle(gt)
         elif gt_opts == GenotypeOption.HOM_ALT:
-            return [1]*len(record.alleles)
+            gt = [1] * len(record.alleles)
         elif gt_opts == GenotypeOption.HOM_REF:
-            return [0]*len(record.alleles)
+            gt = [0] * len(record.alleles)
         else:
-            return random.choice(
+            gt = random.choice(
                 list(itertools.combinations_with_replacement(range(len(record.alleles)), len(record.alleles))))
+        return tuple(gt)
 
     # VCF types are Integer, Float, Flag, Character, and String
     results = []
@@ -110,6 +118,41 @@ def random_base():
     return random.choice(bases)
 
 
+def random_contig(header: pysam.VariantHeader, contig_exclude=None, contig_include=None):
+    contigs = set(header.contigs)
+
+    if contig_exclude is not None and contig_include is not None:
+        raise ValueError('Only one of "contig_exclude" and "contig_include" should be set!')
+
+    # Remove the excluded contigs from the allowed options
+    if contig_exclude is not None:
+        if isinstance(contig_exclude, str):
+            # If it's a string, it's a glob, so remove every matching contig
+            remove = set()
+            for contig in contigs:
+                if fnmatch.fnmatch(contig, contig_exclude):
+                    remove.add(contig)
+            contigs -= remove
+        elif isinstance(contig_exclude, collections.Iterable):
+            # If it's a collection, set difference them
+            contigs -= contig_exclude
+
+    # Keep only included contigs from the allowed options
+    if contig_include is not None:
+        if isinstance(contig_include, str):
+            for contig in contigs:
+                if not fnmatch.fnmatch(contig, contig_include):
+                    contigs -= contig
+        elif isinstance(contig_include, collections.Iterable):
+            # If it's a collection, we can set intersect them
+            contigs &= contig_include
+
+    if len(contigs) == 0:
+        raise Exception('Your contig options are too restrictive and have resulted in no valid contigs!')
+
+    return random.choice([header.contigs[key] for key in contigs])
+
+
 def generate_record(header: pysam.VariantHeader,
                     contig_exclude=None, contig_include=None, **kwargs
                     ) -> pysam.VariantRecord:
@@ -120,7 +163,7 @@ def generate_record(header: pysam.VariantHeader,
     :param contig_include: A glob, or list of strings to include from the valid contigs. Exclude all others
     :param kwargs: A dictionary of keyword args to pass into the data_from_vcf_type function
     """
-    contig = random.choice(header.contigs)
+    contig = random_contig(header, contig_exclude=contig_exclude, contig_include=contig_include)
     record = header.new_record(
         contig=contig.name,
         alleles=[random_base(), random_base()],
@@ -157,7 +200,9 @@ def generate_data(input_vcf: str, output_vcf: str,
 
 def main():
     args = parse_args()
-    generate_data(args.template_vcf, '-', args.num_variants, )
+    generate_data(args.template_vcf, '-', args.num_variants,
+                  contig_include=args.include_contig, contig_exclude=args.exclude_contig, gt_opts=args.gt_opts
+                  )
 
 
 if __name__ == '__main__':

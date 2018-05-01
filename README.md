@@ -25,14 +25,25 @@ usage: improvar [-h] [--num-variants NUM_VARIANTS]
 Generates a fake VCF based on another VCF's header
 
 positional arguments:
-  template_vcf
+  template_vcf          The VCF to base the generated data off
 
 optional arguments:
   -h, --help            show this help message and exit
   --num-variants NUM_VARIANTS, -n NUM_VARIANTS
+                        Number of variants to print
   --gt-opts {GenotypeOption.HOM_REF,GenotypeOption.HOM_ALT,GenotypeOption.HET}
+                        Constraints to apply when generating genotype. Leave
+                        empty to generate entirely random genotypes. Use "het"
+                        to generate only heterozygotes (e.g. 0|1), use "hom-
+                        ref" to generate only homozygous referencegenotpyes
+                        (e.g. 0|0), and use "hom-var" to generate only
+                        homozygous variant genotypes (e.g. 1|1)
   --include-contig INCLUDE_CONTIG
+                        Only output contigs whose name matches this regex
+                        pattern
   --exclude-contig EXCLUDE_CONTIG
+                        Do not output contigs whose name matches this regex
+                        pattern
 ```
 
 `improvar` prints the generated VCF to stdout, so you can pipe the results of this program to a file

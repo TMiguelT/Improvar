@@ -8,6 +8,8 @@ import argparse
 import enum
 import itertools
 import collections
+import re
+import typing
 from signal import signal, SIGPIPE, SIG_DFL
 
 # Handle SIGPIPE so this pipes into `head` correctly
@@ -34,13 +36,41 @@ def parse_args() -> argparse.Namespace:
     """
     Return the parsed args
     """
-    parser = argparse.ArgumentParser(
-        description="Generates a fake VCF based on another VCF's header")
-    parser.add_argument('template_vcf', type=path_exists)
-    parser.add_argument('--num-variants', '-n', type=int, required=False, default=1)
-    parser.add_argument('--gt-opts', choices=list(GenotypeOption), type=GenotypeOption, required=False)
-    parser.add_argument('--include-contig', type=str, required=False)
-    parser.add_argument('--exclude-contig', type=str, required=False)
+    parser = argparse.ArgumentParser(description="Generates a fake VCF based on another VCF's header")
+    parser.add_argument(
+        'template_vcf',
+        type=path_exists,
+        help='The VCF to base the generated data off'
+    )
+    parser.add_argument(
+        '--num-variants',
+        '-n',
+        type=int,
+        required=False,
+        default=1,
+        help='Number of variants to print'
+    )
+    parser.add_argument(
+        '--gt-opts',
+        choices=list(GenotypeOption),
+        type=GenotypeOption,
+        required=False,
+        help='Constraints to apply when generating genotype. Leave empty to generate entirely random genotypes. Use '
+             '"het" to generate only heterozygotes (e.g. 0|1), use "hom-ref" to generate only homozygous reference'
+             'genotpyes (e.g. 0|0), and use "hom-var" to generate only homozygous variant genotypes (e.g. 1|1)'
+    )
+    parser.add_argument(
+        '--include-contig',
+        type=re.compile,
+        required=False,
+        help='Only output contigs whose name matches this regex pattern'
+    )
+    parser.add_argument(
+        '--exclude-contig',
+        type=re.compile,
+        required=False,
+        help='Do not output contigs whose name matches this regex pattern'
+    )
     return parser.parse_args()
 
 
@@ -126,26 +156,11 @@ def random_contig(header: pysam.VariantHeader, contig_exclude=None, contig_inclu
 
     # Remove the excluded contigs from the allowed options
     if contig_exclude is not None:
-        if isinstance(contig_exclude, str):
-            # If it's a string, it's a glob, so remove every matching contig
-            remove = set()
-            for contig in contigs:
-                if fnmatch.fnmatch(contig, contig_exclude):
-                    remove.add(contig)
-            contigs -= remove
-        elif isinstance(contig_exclude, collections.Iterable):
-            # If it's a collection, set difference them
-            contigs -= contig_exclude
+        contigs.difference_update([contig for contig in contigs if contig_exclude.match(contig)])
 
     # Keep only included contigs from the allowed options
     if contig_include is not None:
-        if isinstance(contig_include, str):
-            for contig in contigs:
-                if not fnmatch.fnmatch(contig, contig_include):
-                    contigs -= contig
-        elif isinstance(contig_include, collections.Iterable):
-            # If it's a collection, we can set intersect them
-            contigs &= contig_include
+        contigs.intersection_update([contig for contig in contigs if contig_exclude.match(contig)])
 
     if len(contigs) == 0:
         raise Exception('Your contig options are too restrictive and have resulted in no valid contigs!')
@@ -154,7 +169,7 @@ def random_contig(header: pysam.VariantHeader, contig_exclude=None, contig_inclu
 
 
 def generate_record(header: pysam.VariantHeader,
-                    contig_exclude=None, contig_include=None, **kwargs
+                    contig_exclude: typing.Pattern = None, contig_include: typing.Pattern = None, **kwargs
                     ) -> pysam.VariantRecord:
     """
     Generates a variant record with random data, based on the provided header

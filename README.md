@@ -8,7 +8,7 @@ more completely.
 ## Installation
 Install `improvar` using:
 ```bash
-pip install 'git+https://github.com/TMiguelT/VcfFake#egg=improvar'
+pip install 'git+https://github.com/TMiguelT/Improvar#egg=improvar'
 ```
 
 Note that `improvar` will only work on Python 3.6 and above

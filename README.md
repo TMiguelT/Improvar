@@ -16,7 +16,11 @@ Note that `improvar` will only work on Python 3.6 and above
 ## Usage
 `improvar` installs a command-line utility called `improvar`. Its usage is as follows:
 ```
-usage: improvar [-h] [--num-variants NUM_VARIANTS] template_vcf
+usage: improvar [-h] [--num-variants NUM_VARIANTS]
+                [--gt-opts {GenotypeOption.HOM_REF,GenotypeOption.HOM_ALT,GenotypeOption.HET}]
+                [--include-contig INCLUDE_CONTIG]
+                [--exclude-contig EXCLUDE_CONTIG]
+                template_vcf
 
 Generates a fake VCF based on another VCF's header
 
@@ -26,6 +30,9 @@ positional arguments:
 optional arguments:
   -h, --help            show this help message and exit
   --num-variants NUM_VARIANTS, -n NUM_VARIANTS
+  --gt-opts {GenotypeOption.HOM_REF,GenotypeOption.HOM_ALT,GenotypeOption.HET}
+  --include-contig INCLUDE_CONTIG
+  --exclude-contig EXCLUDE_CONTIG
 ```
 
 `improvar` prints the generated VCF to stdout, so you can pipe the results of this program to a file
